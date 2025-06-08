@@ -27,6 +27,38 @@ except ImportError:
     Image = None
     ImageTk = None
 
+# --- Constants ---
+APP_TITLE = "Photo Analyzer Caption & Evaluation"
+WINDOW_SIZE = "1200x800"
+IMG_FRAME_TITLE = "1. Select Image"
+IMG_LABEL_TEXT = "Drag & drop an image here or click 'Select Image'"
+BTN_SELECT_TEXT = "Select Image"
+BTN_SELECT_TOOLTIP = "Open a file dialog to select an image file."
+MODEL_FRAME_TITLE = "2. Choose Model & Mode"
+MODEL_LABEL_TEXT = "Model:"
+MODEL_OPTIONS = ["gemma3", "llava"]
+MODEL_MENU_TOOLTIP = "Choose the Ollama model to use for analysis."
+MODE_LABEL_TEXT = "Mode:"
+MODES = [("Instagram Caption", "caption"), ("Photo Evaluation", "evaluation")]
+PROMPT_FRAME_TITLE = "3. Custom Prompt (optional)"
+PROMPT_ENTRY_TOOLTIP = "Enter a custom prompt for the AI model (leave blank for default)."
+BTN_GENERATE_TEXT = "Generate"
+BTN_GENERATE_TOOLTIP = "Send the image and prompt to Ollama and generate a response."
+BTN_COPY_TEXT = "Copy to Clipboard"
+BTN_COPY_TOOLTIP = "Copy the generated response to the clipboard."
+OUTPUT_FRAME_TITLE = "Output"
+DEFAULT_CAPTION_PROMPT = (
+    "Generate an Instagram caption and hashtags for this photo. "
+    "Focus on cinematic mood and urban storytelling. Keep it concise and engaging."
+)
+DEFAULT_EVAL_PROMPT = (
+    "Critique this image from a photographic perspective. "
+    "Focus on composition, mood, lighting, and storytelling."
+)
+PROMPT_DISPLAY_PREFIX = "Prompt to be sent:\n"
+PROMPT_DISPLAY_COLOR = "#555"
+PROMPT_DISPLAY_WRAP = 400
+
 # --- Tooltip helper ---
 class ToolTip:
     def __init__(self, widget, text):
@@ -79,8 +111,8 @@ class OllamaResponse:
 class OllamaApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Photo Analyzer Caption & Evaluation")
-        self.geometry("1200x800")  # Wider window
+        self.title(APP_TITLE)
+        self.geometry(WINDOW_SIZE)
         self.resizable(False, False)
 
         self.image_path = None
@@ -116,18 +148,18 @@ class OllamaApp(tk.Tk):
         subtitle.pack(pady=(0, 10))
 
         # Image selection frame
-        img_frame = ttk.LabelFrame(left_frame, text="1. Select Image", padding=(10, 8))
+        img_frame = ttk.LabelFrame(left_frame, text=IMG_FRAME_TITLE, padding=(10, 8))
         img_frame.pack(fill='x', pady=8)
 
         self.img_label = ttk.Label(
             img_frame,
-            text="Drag & drop an image here or click 'Select Image'"
+            text=IMG_LABEL_TEXT
         )
         self.img_label.pack(fill='x', pady=(0, 4))
 
-        btn_select = ttk.Button(img_frame, text="Select Image", command=self.select_image)
+        btn_select = ttk.Button(img_frame, text=BTN_SELECT_TEXT, command=self.select_image)
         btn_select.pack(pady=2)
-        ToolTip(btn_select, "Open a file dialog to select an image file.")
+        ToolTip(btn_select, BTN_SELECT_TOOLTIP)
 
         # Reserve space for preview using a fixed-size frame
         preview_frame = tk.Frame(img_frame, width=180, height=260)
@@ -138,59 +170,63 @@ class OllamaApp(tk.Tk):
         self.preview_label.pack(expand=True)
 
         # Model and mode frame
-        options_frame = ttk.LabelFrame(left_frame, text="2. Choose Model & Mode", padding=(10, 8))
+        options_frame = ttk.LabelFrame(left_frame, text=MODEL_FRAME_TITLE, padding=(10, 8))
         options_frame.pack(fill='x', pady=8)
 
         model_frame = ttk.Frame(options_frame)
         model_frame.pack(fill='x', pady=2)
-        ttk.Label(model_frame, text="Model:").pack(side='left')
-        model_options = ["gemma3", "llava"]
-        model_menu = ttk.OptionMenu(model_frame, self.model_var, self.model_var.get(), *model_options)
+        ttk.Label(model_frame, text=MODEL_LABEL_TEXT).pack(side='left')
+        model_menu = ttk.OptionMenu(model_frame, self.model_var, self.model_var.get(), *MODEL_OPTIONS)
         model_menu.pack(side='left', padx=10)
-        ToolTip(model_menu, "Choose the Ollama model to use for analysis.")
+        ToolTip(model_menu, MODEL_MENU_TOOLTIP)
 
         mode_frame = ttk.Frame(options_frame)
         mode_frame.pack(fill='x', pady=2)
-        ttk.Label(mode_frame, text="Mode:").pack(side='left')
-        modes = [("Instagram Caption", "caption"), ("Photo Evaluation", "evaluation")]
-        for text, val in modes:
+        ttk.Label(mode_frame, text=MODE_LABEL_TEXT).pack(side='left')
+        for text, val in MODES:
             rb = ttk.Radiobutton(mode_frame, text=text, variable=self.mode_var, value=val)
             rb.pack(side='left', padx=10)
             ToolTip(rb, f"Switch to {text.lower()} mode.")
 
         # Show the prompt being used
-        self.prompt_display = tk.Label(left_frame, text="", wraplength=400, justify='left', fg="#555")
+        self.prompt_display = tk.Label(
+            left_frame,
+            text="",
+            wraplength=PROMPT_DISPLAY_WRAP,
+            justify='left',
+            fg=PROMPT_DISPLAY_COLOR
+        )
         self.prompt_display.pack(fill='x', padx=4, pady=(2, 8))
 
         # Prompt frame
-        prompt_frame = ttk.LabelFrame(left_frame, text="3. Custom Prompt (optional)", padding=(10, 8))
+        prompt_frame = ttk.LabelFrame(left_frame, text=PROMPT_FRAME_TITLE, padding=(10, 8))
         prompt_frame.pack(fill='x', pady=8)
         self.prompt_entry = ttk.Entry(prompt_frame, width=80)
         self.prompt_entry.pack(fill='x', padx=2, pady=2)
-        ToolTip(self.prompt_entry, "Enter a custom prompt for the AI model (leave blank for default).")
+        ToolTip(self.prompt_entry, PROMPT_ENTRY_TOOLTIP)
 
         # Generate and progress
         action_frame = ttk.Frame(left_frame)
         action_frame.pack(fill='x', pady=(8, 0))
 
-        self.btn_generate = ttk.Button(action_frame, text="Generate", command=self.on_generate)
+        self.btn_generate = ttk.Button(action_frame, text=BTN_GENERATE_TEXT, command=self.on_generate)
         self.btn_generate.pack(side='left', padx=(0, 10))
-        ToolTip(self.btn_generate, "Send the image and prompt to Ollama and generate a response.")
+        ToolTip(self.btn_generate, BTN_GENERATE_TOOLTIP)
 
         self.progress = ttk.Label(action_frame, text="", foreground="green")
         self.progress.pack(side='left', padx=4)
 
         self.btn_copy = ttk.Button(
             action_frame,
-            text="Copy to Clipboard",
+            text=BTN_COPY_TEXT,
             command=self.copy_to_clipboard,
             state='disabled'
         )
         self.btn_copy.pack(side='right')
-        ToolTip(self.btn_copy, "Copy the generated response to the clipboard.")
+        ToolTip(self.btn_copy, BTN_COPY_TOOLTIP)
 
         # --- Right column: output ---
-        output_frame = ttk.LabelFrame(main_frame, text="Output", padding=(10, 8))
+        output_frame = ttk.LabelFrame(main_frame, text=OUTPUT_FRAME_TITLE, padding=(10, 8))
         output_frame.grid(row=0, column=1, sticky='nsew')
         output_frame.pack_propagate(True)
 
@@ -285,16 +321,10 @@ class OllamaApp(tk.Tk):
         mode = self.mode_var.get()
         if not prompt_text:
             if mode == "caption":
-                prompt_text = (
-                    "Generate an Instagram caption and hashtags for this photo. "
-                    "Focus on mood and storytelling. Keep it concise and engaging."
-                )
+                prompt_text = DEFAULT_CAPTION_PROMPT
             elif mode == "evaluation":
-                prompt_text = (
-                    "Critique this image from a photographic perspective. "
-                    "Focus on composition, mood, lighting, and storytelling."
-                )
-        self.prompt_display.config(text=f"Prompt to be sent:\n{prompt_text}")
+                prompt_text = DEFAULT_EVAL_PROMPT
+        self.prompt_display.config(text=f"{PROMPT_DISPLAY_PREFIX}{prompt_text}")
 
     def on_generate(self):
         if not self.image_b64:
@@ -309,15 +339,9 @@ class OllamaApp(tk.Tk):
 
         if not prompt_text:
             if mode == "caption":
-                prompt_text = (
-                    "Generate an Instagram caption and hashtags for this photo. "
-                    "Focus on cinematic mood and urban storytelling. Keep it concise and engaging."
-                )
+                prompt_text = DEFAULT_CAPTION_PROMPT
             elif mode == "evaluation":
-                prompt_text = (
-                    "Critique this image from a photographic perspective. "
-                    "Focus on composition, mood, lighting, and storytelling."
-                )
+                prompt_text = DEFAULT_EVAL_PROMPT
 
         selected_model = self.model_var.get()
 
