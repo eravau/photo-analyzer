@@ -102,6 +102,4 @@ python photo-analyzer-gui.py
 
 ---
 
-## 7. License
 
-MIT License (see `LICENSE` file if present)
