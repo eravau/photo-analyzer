@@ -8,6 +8,7 @@ from dataclasses import dataclass, fields
 from typing import Optional, List, Any
 import io
 
+# Optional dependencies
 try:
     import pyperclip
 except ImportError:
@@ -38,13 +39,20 @@ class ToolTip:
     def show(self, event=None):
         if self.tipwindow or not self.text:
             return
-        x, y, cx, cy = self.widget.bbox("insert") if hasattr(self.widget, "bbox") else (0,0,0,0)
+        x, y, cx, cy = self.widget.bbox("insert") if hasattr(self.widget, "bbox") else (0, 0, 0, 0)
         x = x + self.widget.winfo_rootx() + 25
         y = y + self.widget.winfo_rooty() + 20
         self.tipwindow = tw = tk.Toplevel(self.widget)
         tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
-        label = tk.Label(tw, text=self.text, background="#ffffe0", relief="solid", borderwidth=1, font=("tahoma", "9", "normal"))
+        label = tk.Label(
+            tw,
+            text=self.text,
+            background="#ffffe0",
+            relief="solid",
+            borderwidth=1,
+            font=("tahoma", "9", "normal")
+        )
         label.pack(ipadx=4)
 
     def hide(self, event=None):
@@ -72,7 +80,7 @@ class OllamaApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Ollama Photo Caption & Evaluation")
-        self.geometry("1100x700")  # Wider window
+        self.geometry("1200x800")  # Wider window
         self.resizable(False, False)
 
         self.image_path = None
@@ -100,14 +108,21 @@ class OllamaApp(tk.Tk):
         title = tk.Label(left_frame, text="Photo Analyzer", font=("Segoe UI", 20, "bold"))
         title.pack(pady=(12, 0))
 
-        subtitle = tk.Label(left_frame, text="Generate Instagram captions, hashtags, or photo critiques using Ollama AI models.", font=("Segoe UI", 11))
+        subtitle = tk.Label(
+            left_frame,
+            text="Generate Instagram captions, hashtags, or photo critiques using Ollama AI models.",
+            font=("Segoe UI", 11)
+        )
         subtitle.pack(pady=(0, 10))
 
         # Image selection frame
         img_frame = ttk.LabelFrame(left_frame, text="1. Select Image", padding=(10, 8))
         img_frame.pack(fill='x', pady=8)
 
-        self.img_label = ttk.Label(img_frame, text="Drag & drop an image here or click 'Select Image'")
+        self.img_label = ttk.Label(
+            img_frame,
+            text="Drag & drop an image here or click 'Select Image'"
+        )
         self.img_label.pack(fill='x', pady=(0, 4))
 
         btn_select = ttk.Button(img_frame, text="Select Image", command=self.select_image)
@@ -143,6 +158,10 @@ class OllamaApp(tk.Tk):
             rb.pack(side='left', padx=10)
             ToolTip(rb, f"Switch to {text.lower()} mode.")
 
+        # Show the prompt being used
+        self.prompt_display = tk.Label(left_frame, text="", wraplength=400, justify='left', fg="#555")
+        self.prompt_display.pack(fill='x', padx=4, pady=(2, 8))
+
         # Prompt frame
         prompt_frame = ttk.LabelFrame(left_frame, text="3. Custom Prompt (optional)", padding=(10, 8))
         prompt_frame.pack(fill='x', pady=8)
@@ -161,7 +180,12 @@ class OllamaApp(tk.Tk):
         self.progress = ttk.Label(action_frame, text="", foreground="green")
         self.progress.pack(side='left', padx=4)
 
-        self.btn_copy = ttk.Button(action_frame, text="Copy to Clipboard", command=self.copy_to_clipboard, state='disabled')
+        self.btn_copy = ttk.Button(
+            action_frame,
+            text="Copy to Clipboard",
+            command=self.copy_to_clipboard,
+            state='disabled'
+        )
         self.btn_copy.pack(side='right')
         ToolTip(self.btn_copy, "Copy the generated response to the clipboard.")
 
@@ -170,8 +194,20 @@ class OllamaApp(tk.Tk):
         output_frame.grid(row=0, column=1, sticky='nsew')
         output_frame.pack_propagate(True)
 
-        self.output_box = scrolledtext.ScrolledText(output_frame, height=10, wrap='word', font=("Consolas", 11))
+        self.output_box = scrolledtext.ScrolledText(
+            output_frame,
+            height=10,
+            wrap='word',
+            font=("Consolas", 11)
+        )
         self.output_box.pack(fill='both', expand=True)
+
+        # Bind events to update prompt display
+        self.prompt_entry.bind("<KeyRelease>", lambda e: self.update_prompt_display())
+        self.mode_var.trace_add("write", lambda *a: self.update_prompt_display())
+
+        # Initialize the prompt display
+        self.update_prompt_display()
 
     def make_drag_and_drop_work(self):
         def drop(event):
@@ -183,6 +219,7 @@ class OllamaApp(tk.Tk):
                 else:
                     messagebox.showerror("Invalid file", "Please drop a valid image file.")
             return "break"
+
         self.img_label.drop_target_register = getattr(self.img_label, "drop_target_register", lambda *a: None)
         self.img_label.drop_target_register('DND_Files')
         self.img_label.dnd_bind = getattr(self.img_label, "dnd_bind", lambda *a: None)
@@ -202,7 +239,10 @@ class OllamaApp(tk.Tk):
             img_bytes = None
             if path.lower().endswith(".cr3"):
                 if rawpy is None or imageio is None:
-                    messagebox.showerror("Missing dependency", "rawpy and imageio are required for CR3 support.\nInstall with: pip install rawpy imageio")
+                    messagebox.showerror(
+                        "Missing dependency",
+                        "rawpy and imageio are required for CR3 support.\nInstall with: pip install rawpy imageio"
+                    )
                     self.image_b64 = None
                     self.show_preview(None)
                     return
@@ -240,6 +280,22 @@ class OllamaApp(tk.Tk):
             self.preview_label.config(text=f"Preview error: {e}", image='')
             self.preview_imgtk = None
 
+    def update_prompt_display(self, *args):
+        prompt_text = self.prompt_entry.get().strip()
+        mode = self.mode_var.get()
+        if not prompt_text:
+            if mode == "caption":
+                prompt_text = (
+                    "Generate an Instagram caption and hashtags for this photo. "
+                    "Focus on mood and storytelling. Keep it concise and engaging."
+                )
+            elif mode == "evaluation":
+                prompt_text = (
+                    "Critique this image from a photographic perspective. "
+                    "Focus on composition, mood, lighting, and storytelling."
+                )
+        self.prompt_display.config(text=f"Prompt to be sent:\n{prompt_text}")
+
     def on_generate(self):
         if not self.image_b64:
             messagebox.showwarning("No image", "Please select or drag & drop an image first.")
@@ -248,13 +304,20 @@ class OllamaApp(tk.Tk):
         prompt_text = self.prompt_entry.get().strip()
         mode = self.mode_var.get()
 
+        # Update prompt display before sending
+        self.update_prompt_display()
+
         if not prompt_text:
             if mode == "caption":
-                prompt_text = ("Generate an Instagram caption and hashtags for this photo. "
-                               "Focus on cinematic mood and urban storytelling. Keep it concise and engaging.")
+                prompt_text = (
+                    "Generate an Instagram caption and hashtags for this photo. "
+                    "Focus on cinematic mood and urban storytelling. Keep it concise and engaging."
+                )
             elif mode == "evaluation":
-                prompt_text = ("Critique this image from a photographic perspective. "
-                               "Focus on composition, mood, lighting, and storytelling.")
+                prompt_text = (
+                    "Critique this image from a photographic perspective. "
+                    "Focus on composition, mood, lighting, and storytelling."
+                )
 
         selected_model = self.model_var.get()
 
@@ -263,7 +326,11 @@ class OllamaApp(tk.Tk):
         self.progress.config(text="Generating...")
         self.output_box.delete(1.0, tk.END)
 
-        threading.Thread(target=self.call_ollama_api, args=(self.image_b64, prompt_text, selected_model), daemon=True).start()
+        threading.Thread(
+            target=self.call_ollama_api,
+            args=(self.image_b64, prompt_text, selected_model),
+            daemon=True
+        ).start()
 
     def call_ollama_api(self, image_b64, prompt, model):
         payload = {
@@ -272,7 +339,12 @@ class OllamaApp(tk.Tk):
             "images": [image_b64]
         }
         try:
-            response = requests.post("http://localhost:11434/api/generate", json=payload, stream=True, timeout=120)
+            response = requests.post(
+                "http://localhost:11434/api/generate",
+                json=payload,
+                stream=True,
+                timeout=120
+            )
             response.raise_for_status()
         except requests.RequestException as e:
             self.append_text(f"\nRequest failed: {e}\n")
