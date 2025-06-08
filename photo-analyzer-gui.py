@@ -13,7 +13,6 @@ try:
 except ImportError:
     pyperclip = None
 
-# Add these imports for CR3 support
 try:
     import rawpy
     import imageio.v2 as imageio
@@ -21,12 +20,38 @@ except ImportError:
     rawpy = None
     imageio = None
 
-# Add Pillow for image preview
 try:
     from PIL import Image, ImageTk
 except ImportError:
     Image = None
     ImageTk = None
+
+# --- Tooltip helper ---
+class ToolTip:
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tipwindow = None
+        widget.bind("<Enter>", self.show)
+        widget.bind("<Leave>", self.hide)
+
+    def show(self, event=None):
+        if self.tipwindow or not self.text:
+            return
+        x, y, cx, cy = self.widget.bbox("insert") if hasattr(self.widget, "bbox") else (0,0,0,0)
+        x = x + self.widget.winfo_rootx() + 25
+        y = y + self.widget.winfo_rooty() + 20
+        self.tipwindow = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        label = tk.Label(tw, text=self.text, background="#ffffe0", relief="solid", borderwidth=1, font=("tahoma", "9", "normal"))
+        label.pack(ipadx=4)
+
+    def hide(self, event=None):
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            tw.destroy()
 
 @dataclass
 class OllamaResponse:
@@ -47,68 +72,98 @@ class OllamaApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Ollama Photo Caption & Evaluation")
-        self.geometry("700x600")
+        self.geometry("650x800")
+        self.resizable(False, False)
 
         self.image_path = None
         self.image_b64 = None
-        self.preview_imgtk = None  # Prevent garbage collection
+        self.preview_imgtk = None
 
-        # Add model selection variable
         self.model_var = tk.StringVar(value="llava")
+        self.mode_var = tk.StringVar(value="caption")
 
         self.create_widgets()
         self.make_drag_and_drop_work()
 
     def create_widgets(self):
-        # Frame for image select + drag-drop
-        frm = ttk.Frame(self)
-        frm.pack(padx=10, pady=10, fill='x')
+        # Title
+        title = tk.Label(self, text="Photo Analyzer", font=("Segoe UI", 20, "bold"))
+        title.pack(pady=(12, 0))
 
-        self.img_label = ttk.Label(frm, text="Drag & drop an image here or click 'Select Image'")
-        self.img_label.pack(fill='x')
+        subtitle = tk.Label(self, text="Generate Instagram captions, hashtags, or photo critiques using Ollama AI models.", font=("Segoe UI", 11))
+        subtitle.pack(pady=(0, 10))
 
-        btn_select = ttk.Button(frm, text="Select Image", command=self.select_image)
-        btn_select.pack(pady=5)
+        # Image selection frame
+        img_frame = ttk.LabelFrame(self, text="1. Select Image", padding=(10, 8))
+        img_frame.pack(padx=16, pady=8, fill='x')
 
-        # Add image preview label
-        self.preview_label = ttk.Label(frm)
-        self.preview_label.pack(pady=5)
+        self.img_label = ttk.Label(img_frame, text="Drag & drop an image here or click 'Select Image'")
+        self.img_label.pack(fill='x', pady=(0, 4))
 
-        # Model selector
-        model_frame = ttk.Frame(self)
-        model_frame.pack(padx=10, pady=5, fill='x')
-        ttk.Label(model_frame, text="Choose model:").pack(side='left')
+        btn_select = ttk.Button(img_frame, text="Select Image", command=self.select_image)
+        btn_select.pack(pady=2)
+        ToolTip(btn_select, "Open a file dialog to select an image file.")
+
+        # Reserve space for preview using a fixed-size frame
+        preview_frame = tk.Frame(img_frame, width=180, height=260)
+        preview_frame.pack(pady=4)
+        preview_frame.pack_propagate(False)  # Prevent frame from shrinking to fit contents
+
+        self.preview_label = ttk.Label(preview_frame)
+        self.preview_label.pack(expand=True)
+
+        # Model and mode frame
+        options_frame = ttk.LabelFrame(self, text="2. Choose Model & Mode", padding=(10, 8))
+        options_frame.pack(padx=16, pady=8, fill='x')
+
+        model_frame = ttk.Frame(options_frame)
+        model_frame.pack(fill='x', pady=2)
+        ttk.Label(model_frame, text="Model:").pack(side='left')
         model_options = ["gemma3", "llava"]
         model_menu = ttk.OptionMenu(model_frame, self.model_var, self.model_var.get(), *model_options)
         model_menu.pack(side='left', padx=10)
+        ToolTip(model_menu, "Choose the Ollama model to use for analysis.")
 
-        # Option to choose caption or evaluation
-        self.mode_var = tk.StringVar(value="caption")
+        mode_frame = ttk.Frame(options_frame)
+        mode_frame.pack(fill='x', pady=2)
+        ttk.Label(mode_frame, text="Mode:").pack(side='left')
         modes = [("Instagram Caption", "caption"), ("Photo Evaluation", "evaluation")]
-        mode_frame = ttk.Frame(self)
-        mode_frame.pack(padx=10, pady=5, fill='x')
-        ttk.Label(mode_frame, text="Choose mode:").pack(side='left')
         for text, val in modes:
-            ttk.Radiobutton(mode_frame, text=text, variable=self.mode_var, value=val).pack(side='left', padx=10)
+            rb = ttk.Radiobutton(mode_frame, text=text, variable=self.mode_var, value=val)
+            rb.pack(side='left', padx=10)
+            ToolTip(rb, f"Switch to {text.lower()} mode.")
 
-        # Custom prompt input
-        ttk.Label(self, text="Custom prompt (optional):").pack(anchor='w', padx=10)
-        self.prompt_entry = ttk.Entry(self, width=80)
-        self.prompt_entry.pack(padx=10, pady=5, fill='x')
+        # Prompt frame
+        prompt_frame = ttk.LabelFrame(self, text="3. Custom Prompt (optional)", padding=(10, 8))
+        prompt_frame.pack(padx=16, pady=8, fill='x')
+        self.prompt_entry = ttk.Entry(prompt_frame, width=80)
+        self.prompt_entry.pack(fill='x', padx=2, pady=2)
+        ToolTip(self.prompt_entry, "Enter a custom prompt for the AI model (leave blank for default).")
 
-        # Button to generate
-        self.btn_generate = ttk.Button(self, text="Generate", command=self.on_generate)
-        self.btn_generate.pack(pady=10)
+        # Generate and progress
+        action_frame = ttk.Frame(self)
+        action_frame.pack(padx=16, pady=(8, 0), fill='x')
 
-        # Output text box (scrolled)
-        self.output_box = scrolledtext.ScrolledText(self, height=15, wrap='word')
-        self.output_box.pack(padx=10, pady=10, fill='both', expand=True)
+        self.btn_generate = ttk.Button(action_frame, text="Generate", command=self.on_generate)
+        self.btn_generate.pack(side='left', padx=(0, 10))
+        ToolTip(self.btn_generate, "Send the image and prompt to Ollama and generate a response.")
+
+        self.progress = ttk.Label(action_frame, text="", foreground="green")
+        self.progress.pack(side='left', padx=4)
+
+        self.btn_copy = ttk.Button(action_frame, text="Copy to Clipboard", command=self.copy_to_clipboard, state='disabled')
+        self.btn_copy.pack(side='right')
+        ToolTip(self.btn_copy, "Copy the generated response to the clipboard.")
+
+        # Output frame
+        output_frame = ttk.LabelFrame(self, text="4. Output", padding=(10, 8))
+        output_frame.pack(padx=16, pady=8, fill='both', expand=True)
+
+        self.output_box = scrolledtext.ScrolledText(output_frame, height=5, wrap='word', font=("Consolas", 11))
+        self.output_box.pack(fill='both', expand=True)
 
     def make_drag_and_drop_work(self):
-        # On Windows, simplest drag and drop support via window binding for dropped files
-        # It gives you a string with file paths separated by space
         def drop(event):
-            # Extract file path
             files = self.tk.splitlist(event.data)
             if files:
                 filepath = files[0]
@@ -117,14 +172,10 @@ class OllamaApp(tk.Tk):
                 else:
                     messagebox.showerror("Invalid file", "Please drop a valid image file.")
             return "break"
-
-        # Bind drop event (Windows only)
         self.img_label.drop_target_register = getattr(self.img_label, "drop_target_register", lambda *a: None)
         self.img_label.drop_target_register('DND_Files')
         self.img_label.dnd_bind = getattr(self.img_label, "dnd_bind", lambda *a: None)
         self.img_label.dnd_bind('<<Drop>>', drop)
-
-        # For macOS/Linux you need additional libs, so we fallback to file picker
 
     def select_image(self):
         filepath = filedialog.askopenfilename(
@@ -163,7 +214,7 @@ class OllamaApp(tk.Tk):
 
     def show_preview(self, img_bytes):
         if Image is None or ImageTk is None:
-            self.preview_label.config(text="Pillow not installed, preview unavailable.")
+            self.preview_label.config(text="Pillow not installed, preview unavailable.", image='')
             return
         if img_bytes is None:
             self.preview_label.config(image='', text="No preview available.")
@@ -171,11 +222,11 @@ class OllamaApp(tk.Tk):
             return
         try:
             img = Image.open(io.BytesIO(img_bytes))
-            img.thumbnail((300, 300))
+            img.thumbnail((180, 260))
             self.preview_imgtk = ImageTk.PhotoImage(img)
             self.preview_label.config(image=self.preview_imgtk, text='')
         except Exception as e:
-            self.preview_label.config(text=f"Preview error: {e}")
+            self.preview_label.config(text=f"Preview error: {e}", image='')
             self.preview_imgtk = None
 
     def on_generate(self):
@@ -186,7 +237,6 @@ class OllamaApp(tk.Tk):
         prompt_text = self.prompt_entry.get().strip()
         mode = self.mode_var.get()
 
-        # Set default prompt if none provided
         if not prompt_text:
             if mode == "caption":
                 prompt_text = ("Generate an Instagram caption and hashtags for this photo. "
@@ -195,14 +245,13 @@ class OllamaApp(tk.Tk):
                 prompt_text = ("Critique this image from a photographic perspective. "
                                "Focus on composition, mood, lighting, and storytelling.")
 
-        # Get selected model
         selected_model = self.model_var.get()
 
-        # Disable button during generation
         self.btn_generate.config(state='disabled')
+        self.btn_copy.config(state='disabled')
+        self.progress.config(text="Generating...")
         self.output_box.delete(1.0, tk.END)
 
-        # Run network call in a separate thread so UI doesn't freeze
         threading.Thread(target=self.call_ollama_api, args=(self.image_b64, prompt_text, selected_model), daemon=True).start()
 
     def call_ollama_api(self, image_b64, prompt, model):
@@ -212,11 +261,12 @@ class OllamaApp(tk.Tk):
             "images": [image_b64]
         }
         try:
-            response = requests.post("http://localhost:11434/api/generate", json=payload, stream=True)
+            response = requests.post("http://localhost:11434/api/generate", json=payload, stream=True, timeout=120)
             response.raise_for_status()
         except requests.RequestException as e:
-            self.append_text(f"\nRequest failed: {e}")
-            self.btn_generate.config(state='normal')
+            self.append_text(f"\nRequest failed: {e}\n")
+            self.after(0, lambda: self.progress.config(text=""))
+            self.after(0, lambda: self.btn_generate.config(state='normal'))
             return
 
         full_response = ""
@@ -233,15 +283,31 @@ class OllamaApp(tk.Tk):
                     break
 
         self.append_text("\n\n--- Done ---\n")
+        self.after(0, lambda: self.progress.config(text="Done!"))
+        self.after(0, lambda: self.btn_generate.config(state='normal'))
+        self.after(0, lambda: self.btn_copy.config(state='normal'))
 
-        # Copy to clipboard if pyperclip is installed
+        # Auto-copy if pyperclip is installed
         if pyperclip:
             pyperclip.copy(full_response)
             self.append_text("[Response copied to clipboard]\n")
         else:
-            self.append_text("[Install 'pyperclip' to enable clipboard copying]\n")
+            self.append_text("[Install 'pyperclip' to enable automatic clipboard copying]\n")
 
-        self.btn_generate.config(state='normal')
+        self.last_response = full_response
+
+    def copy_to_clipboard(self):
+        text = self.output_box.get(1.0, tk.END).strip()
+        if not text:
+            messagebox.showinfo("Nothing to copy", "No output to copy.")
+            return
+        if pyperclip:
+            pyperclip.copy(text)
+            messagebox.showinfo("Copied", "Output copied to clipboard.")
+        else:
+            self.clipboard_clear()
+            self.clipboard_append(text)
+            messagebox.showinfo("Copied", "Output copied to clipboard (using Tkinter).")
 
     def append_text(self, text):
         def inner():
