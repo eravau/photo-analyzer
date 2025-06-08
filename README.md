@@ -102,4 +102,11 @@ python photo-analyzer-gui.py
 
 ---
 
+## 7. License
+
+MIT License (see `LICENSE` file if present)
+
+**Note:**  
+This project uses third-party Python libraries (such as requests, Pillow, rawpy, imageio, pyperclip) which are distributed under their own respective licenses. Please refer to each library's documentation for license details.
+
 
