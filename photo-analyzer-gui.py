@@ -72,7 +72,7 @@ class OllamaApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Ollama Photo Caption & Evaluation")
-        self.geometry("650x800")
+        self.geometry("1100x700")  # Wider window
         self.resizable(False, False)
 
         self.image_path = None
@@ -86,16 +86,26 @@ class OllamaApp(tk.Tk):
         self.make_drag_and_drop_work()
 
     def create_widgets(self):
+        # Main container with two columns
+        main_frame = tk.Frame(self)
+        main_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        main_frame.columnconfigure(0, weight=0, minsize=420)
+        main_frame.columnconfigure(1, weight=1)
+
+        # --- Left column: controls ---
+        left_frame = tk.Frame(main_frame)
+        left_frame.grid(row=0, column=0, sticky='nsew', padx=(0, 10))
+
         # Title
-        title = tk.Label(self, text="Photo Analyzer", font=("Segoe UI", 20, "bold"))
+        title = tk.Label(left_frame, text="Photo Analyzer", font=("Segoe UI", 20, "bold"))
         title.pack(pady=(12, 0))
 
-        subtitle = tk.Label(self, text="Generate Instagram captions, hashtags, or photo critiques using Ollama AI models.", font=("Segoe UI", 11))
+        subtitle = tk.Label(left_frame, text="Generate Instagram captions, hashtags, or photo critiques using Ollama AI models.", font=("Segoe UI", 11))
         subtitle.pack(pady=(0, 10))
 
         # Image selection frame
-        img_frame = ttk.LabelFrame(self, text="1. Select Image", padding=(10, 8))
-        img_frame.pack(padx=16, pady=8, fill='x')
+        img_frame = ttk.LabelFrame(left_frame, text="1. Select Image", padding=(10, 8))
+        img_frame.pack(fill='x', pady=8)
 
         self.img_label = ttk.Label(img_frame, text="Drag & drop an image here or click 'Select Image'")
         self.img_label.pack(fill='x', pady=(0, 4))
@@ -107,14 +117,14 @@ class OllamaApp(tk.Tk):
         # Reserve space for preview using a fixed-size frame
         preview_frame = tk.Frame(img_frame, width=180, height=260)
         preview_frame.pack(pady=4)
-        preview_frame.pack_propagate(False)  # Prevent frame from shrinking to fit contents
+        preview_frame.pack_propagate(False)
 
         self.preview_label = ttk.Label(preview_frame)
         self.preview_label.pack(expand=True)
 
         # Model and mode frame
-        options_frame = ttk.LabelFrame(self, text="2. Choose Model & Mode", padding=(10, 8))
-        options_frame.pack(padx=16, pady=8, fill='x')
+        options_frame = ttk.LabelFrame(left_frame, text="2. Choose Model & Mode", padding=(10, 8))
+        options_frame.pack(fill='x', pady=8)
 
         model_frame = ttk.Frame(options_frame)
         model_frame.pack(fill='x', pady=2)
@@ -134,15 +144,15 @@ class OllamaApp(tk.Tk):
             ToolTip(rb, f"Switch to {text.lower()} mode.")
 
         # Prompt frame
-        prompt_frame = ttk.LabelFrame(self, text="3. Custom Prompt (optional)", padding=(10, 8))
-        prompt_frame.pack(padx=16, pady=8, fill='x')
+        prompt_frame = ttk.LabelFrame(left_frame, text="3. Custom Prompt (optional)", padding=(10, 8))
+        prompt_frame.pack(fill='x', pady=8)
         self.prompt_entry = ttk.Entry(prompt_frame, width=80)
         self.prompt_entry.pack(fill='x', padx=2, pady=2)
         ToolTip(self.prompt_entry, "Enter a custom prompt for the AI model (leave blank for default).")
 
         # Generate and progress
-        action_frame = ttk.Frame(self)
-        action_frame.pack(padx=16, pady=(8, 0), fill='x')
+        action_frame = ttk.Frame(left_frame)
+        action_frame.pack(fill='x', pady=(8, 0))
 
         self.btn_generate = ttk.Button(action_frame, text="Generate", command=self.on_generate)
         self.btn_generate.pack(side='left', padx=(0, 10))
@@ -155,11 +165,12 @@ class OllamaApp(tk.Tk):
         self.btn_copy.pack(side='right')
         ToolTip(self.btn_copy, "Copy the generated response to the clipboard.")
 
-        # Output frame
-        output_frame = ttk.LabelFrame(self, text="4. Output", padding=(10, 8))
-        output_frame.pack(padx=16, pady=8, fill='both', expand=True)
+        # --- Right column: output ---
+        output_frame = ttk.LabelFrame(main_frame, text="Output", padding=(10, 8))
+        output_frame.grid(row=0, column=1, sticky='nsew')
+        output_frame.pack_propagate(True)
 
-        self.output_box = scrolledtext.ScrolledText(output_frame, height=5, wrap='word', font=("Consolas", 11))
+        self.output_box = scrolledtext.ScrolledText(output_frame, height=10, wrap='word', font=("Consolas", 11))
         self.output_box.pack(fill='both', expand=True)
 
     def make_drag_and_drop_work(self):
@@ -290,7 +301,7 @@ class OllamaApp(tk.Tk):
         # Auto-copy if pyperclip is installed
         if pyperclip:
             pyperclip.copy(full_response)
-            self.append_text("[Response copied to clipboard]\n")
+            self.append_text("[Output copied to clipboard]\n")
         else:
             self.append_text("[Install 'pyperclip' to enable automatic clipboard copying]\n")
 
