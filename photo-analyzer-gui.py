@@ -79,7 +79,7 @@ class OllamaResponse:
 class OllamaApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("Photo analyze - Caption & Evaluation")
+        self.title("Photo analyzer - Caption & Evaluation")
         self.geometry("1200x800")  # Wider window
         self.resizable(False, False)
 
