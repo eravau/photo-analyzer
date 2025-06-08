@@ -11,6 +11,8 @@ A desktop tool for generating Instagram captions, hashtags, and photographic eva
 - Image preview (requires Pillow)
 - Clipboard copy of results (requires pyperclip)
 
+<img src="Screenshot.png" alt="Screenshot of Photo Analyzer" width="650" />
+
 ---
 
 ## 1. Prerequisites
