@@ -50,15 +50,6 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 
-# Image outputs
-*.jpg
-*.jpeg
-*.png
-*.bmp
-*.gif
-*.webp
-*.cr3
-
 # Logs
 *.log
 
