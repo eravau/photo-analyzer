@@ -70,7 +70,7 @@ pip install requests pillow pyperclip rawpy imageio
 ## 4. Run the Application
 
 ```sh
-python photo-analyzer-gui.py
+python src/photo_analyzer/photo-analyzer-gui.py
 ```
 
 - The GUI will open. Drag & drop an image or use "Select Image".
